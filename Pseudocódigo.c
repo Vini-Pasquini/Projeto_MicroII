@@ -106,7 +106,31 @@ void COMANDO_21(){
 }
 /* Código Principal */
 int main(){
-	// Este codigo roda ate uma interrupcao ocorrer, entao RTI() eh chamada;
+	/* Inicializacao dos registradores necessarios */
+	sp = STACK;
+	
+	r8 = BASE_IO;
+	
+	/* Habilitacao das interrupcoes necessarias */
+	// JTAG
+	ldwio( r10, JTAG_Ctrl*r8 );
+	ori( r10, r10, 0x1 );
+	stwio( r10, JTAG_Ctrl*r8 );
+	
+	/* Habilitacao das interrupcoes dos dispositivos no ienable */
+	r10 = 0x103; // refetente às IRQ 0 (Timer), 1 (Botoes) e 8 (Jtag);
+	wrctl( ienable, r10 );
+	
+	/* Habilitacao das interrupcoes no processador */
+	r10 = 0x1;
+	wrctl( status, r10 );
+	
+	/* Resto do código */
+	// Este loop roda ate uma interrupcao ocorrer, entao RTI() eh chamada;
+	for(;;){
+		
+	}
+	
 	return 0;
 }
 
