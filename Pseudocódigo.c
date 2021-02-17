@@ -43,9 +43,9 @@ void RTI(int dispositivo){
 			break;
 		case JTAG_Ctrl:
 			if(lastChar == 0x0a /* ENTER */ ){
+				COMANDO_VALIDADO();
 				buffer = {}; // limpa buffer
 				lastChar = {}; // limpa lasChar
-				COMANDO_VALIDADO();
 			}else{
 				// "NiosII" como metodos .c
 				ldwio( rXX, JTAG_Data*r8 ); // le data (reseta RI e pega char)
@@ -53,9 +53,8 @@ void RTI(int dispositivo){
 				rYY = buffer; // rYY = 0xaabbccddee;
 				slli( rYY, rYY, 8 ); // 0xbbccddee00;
 				or( buffer, rYY, rXX ); // 0xbbccddeeff;
-				
-				stwio( JTAG_Data*r8, rXX); // escreve char no terminal
-			}break;
+			}stwio( rXX, JTAG_Data*r8 ); // escreve char no terminal
+			break;
 		default:
 			break;
 	}return;
