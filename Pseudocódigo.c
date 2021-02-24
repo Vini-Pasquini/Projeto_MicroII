@@ -1,3 +1,13 @@
+
+/*
+ * O pseudocodigo deveria ser feito primeiro para ter uma linha de raciocinio,
+ * e com base no mesmo, fazer o codigo principal. Entretanto, eu comecei a
+ * primeiro fazer o codigo principal, e só depois pensar como ficaria o pseudocodigo,
+ * completamente inutilizando fazer o pseudocodigo. Dito isso, estou descontinuando
+ * o pseudocodigo no estado atual para focar apenas no codigo principal, ja que
+ * este aqui estava me atrasando mais do que ajudando.
+ */
+
 /* Pseudocodigo escrito usando sintaxe SIMILAR a c (nao necessariamente correta) */
 
 /* Definicao dos Enderecos Necessarios */
@@ -15,7 +25,7 @@
 #define TM_Status	0x2000
 #define TM_Ctrl 	0x2004
 #define TM_Vle_Low	0x2008
-#define TM_Vle_High 0x200C
+#define TM_Vle_High	0x200C
 
 /* Definicao dos Metodos chamados por Interrupcao */
 // Possivel que algum metodo seja mudado para polling no codigo principal
@@ -172,7 +182,6 @@ int main(){
 	
 	return 0;
 }
-
 
 
 
