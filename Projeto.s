@@ -1,6 +1,9 @@
 .equ	STACK,		0x10000
 .equ	BASE_IO,	0x10000000
 # offsets
+.equ	GREEN_LED,	0x10 # proposito de teste
+.equ	DSPL_7SEG,	0x20
+.equ	SWTCH,		0x40
 .equ	JTAG_Data,	0x1000
 .equ	JTAG_Ctrl,	0x1004
 
@@ -104,20 +107,43 @@ VALID_COMMAND:
 	NO_SPACE: # se nao tiver, eh um comando simples
 	ldb 	r11, 3(r10)
 	movi	r12, 0x30
-	bne 	r11, r12, NOT_FOUND
+	beq 	r11, r12, SIMPLE_0
+	movi	r12, 0x31
+	beq 	r11, r12, SIMPLE_1
+	movi	r12, 0x32
+	beq 	r11, r12, SIMPLE_2
+	br  	NOT_FOUND
 	
+		SIMPLE_0:
 	ldb 	r11, 4(r10)
 	movi	r12, 0x32
 	beq 	r11, r12, CMD_02
 	movi	r12, 0x33
 	beq 	r11, r12, CMD_03
-	br		END_CHECK
-	HAS_SPACE: # se tem, eh um comando composto (com parametro passado)
-	ldb 	r11, 0(r10) # veriica primeira posicao (so pode ser 0, por enquanto)
-	movi	r12, 0x30
-	bne 	r11, r12, NOT_FOUND
+	br		NOT_FOUND
 	
-	ldb 	r11, 1(r10) # veriica segunda posicao
+		SIMPLE_1:
+	ldb 	r11, 4(r10)
+	movi	r12, 0x30
+	beq 	r11, r12, CMD_10
+	br		NOT_FOUND
+	
+		SIMPLE_2:
+	ldb 	r11, 4(r10)
+	movi	r12, 0x30
+	beq 	r11, r12, CMD_20
+	movi	r12, 0x31
+	beq 	r11, r12, CMD_21
+	br  	NOT_FOUND
+	
+	HAS_SPACE: # se tem, eh um comando composto (com parametro passado)
+	ldb 	r11, 0(r10)
+	movi	r12, 0x30
+	beq 	r11, r12, CMPLX_0
+	br  	NOT_FOUND
+	
+		CMPLX_0:
+	ldb 	r11, 1(r10)
 	movi	r12, 0x30
 	beq 	r11, r12, CMD_00
 	movi	r12, 0x31
@@ -138,6 +164,7 @@ VALID_COMMAND:
 	call	LEDS_OFF
 	br		END_CHECK
 		CMD_10:
+	call	SWTCH_NUM
 	br		END_CHECK
 		CMD_20:
 	br		END_CHECK
@@ -249,6 +276,17 @@ LEDS_OFF: # comando 03
 	addi	sp, sp, 4
 	ret
 	
+SWTCH_NUM: # comando 10
+	addi	sp, sp, -4
+	stw 	ra, (sp)
+	
+	movia	r12, D7_SEG
+	stwio	r12, GREEN_LED(r8)
+	
+	ldw 	ra, (sp)
+	addi	sp, sp, 4
+	ret
+	
 LED_TESTE: # place-holder
 	addi	sp, sp, -12
 	stw 	r12, 8(sp)
@@ -323,5 +361,7 @@ MAIN:
 	
 LED_SEQ: # sequencia que define quais leds acendem
 .word 0x00000000
+D7_SEG: # tabela de conversao para decimal em 7-segmentos
+.byte 0b01110110
 BUFFER: # buffer para os comandos
 .byte 0x00, 0x00, 0x00, 0x00, 0x00
