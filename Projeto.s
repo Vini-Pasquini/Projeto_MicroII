@@ -104,7 +104,13 @@ VALID_COMMAND:
 	NO_SPACE: # se nao tiver, eh um comando simples
 	ldb 	r11, 3(r10)
 	movi	r12, 0x30
+	bne 	r11, r12, NOT_FOUND
+	
+	ldb 	r11, 4(r10)
+	movi	r12, 0x32
 	beq 	r11, r12, CMD_02
+	movi	r12, 0x33
+	beq 	r11, r12, CMD_03
 	br		END_CHECK
 	HAS_SPACE: # se tem, eh um comando composto (com parametro passado)
 	ldb 	r11, 0(r10) # veriica primeira posicao (so pode ser 0, por enquanto)
@@ -126,6 +132,9 @@ VALID_COMMAND:
 	call	LED_OFF
 	br		END_CHECK
 		CMD_02:
+	call	LEDS_ON
+	br		END_CHECK
+		CMD_03:
 	call	LEDS_OFF
 	br		END_CHECK
 		CMD_10:
@@ -214,7 +223,21 @@ LED_OFF: # comando 01
 	addi	sp, sp, 4
 	ret
 	
-LEDS_OFF: # comando 02
+LEDS_ON: # comando 02
+	addi	sp, sp, -4
+	stw 	ra, (sp)
+	
+	# apaga todos os leds
+	movia 	r12, LED_SEQ
+	ori 	r11, r0, 0xFFFF
+	orhi	r11, r11, 0xFFFF
+	stw 	r11, 0(r12)
+	
+	ldw 	ra, (sp)
+	addi	sp, sp, 4
+	ret
+	
+LEDS_OFF: # comando 03
 	addi	sp, sp, -4
 	stw 	ra, (sp)
 	
