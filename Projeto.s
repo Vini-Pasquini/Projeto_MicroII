@@ -1,15 +1,19 @@
 .equ	STACK,		0x10000
 .equ	BASE_IO,	0x10000000
 # offsets
+.equ	RED_LED,	0x0
 .equ	GREEN_LED,	0x10 # proposito de teste
-.equ	DSPL_7SEG,	0x20
+.equ	D7S_Low,	0x20
+.equ	D7S_High,	0x30
 .equ	SWTCH,		0x40
 .equ	JTAG_Data,	0x1000
 .equ	JTAG_Ctrl,	0x1004
 
 # RTI
 .org 0x20
-	addi	sp, sp, -24
+	addi	sp, sp, -32
+	stw 	r15, 28(sp)
+	stw 	r14, 24(sp)
 	stw 	r13, 20(sp)
 	stw 	r12, 16(sp)
 	stw 	r11, 12(sp)
@@ -28,8 +32,10 @@
 	ldw 	r11, 12(sp)
 	ldw 	r12, 16(sp)
 	ldw 	r13, 20(sp)
+	ldw 	r14, 24(sp)
+	ldw 	r15, 28(sp)
 	ldw 	ra, (sp)
-	addi	sp, sp, 24
+	addi	sp, sp, 32
 	eret
 
 JTAG_INTERRUPT:
@@ -280,8 +286,31 @@ SWTCH_NUM: # comando 10
 	addi	sp, sp, -4
 	stw 	ra, (sp)
 	
+	stwio	r0, D7S_Low(r8)
+	stwio	r0, D7S_High(r8)
+	
+	ldwio	r11, SWTCH(r8)
+	
+	movi	r9, 0x0
+	GET_DIGIT:
+	movi	r12, 0xA
+	divu	r13, r11, r12
+	mul 	r14, r13, r12
+	sub 	r14, r11, r14
+	
+	mov 	r11, r13
+	
 	movia	r12, D7_SEG
-	stwio	r12, GREEN_LED(r8)
+	add		r12, r12, r14
+	ldb 	r13, (r12)
+	
+	sll 	r13, r13, r9
+	or  	r15, r15, r13
+	
+	addi	r9, r9, 8
+	bne 	r11, r0, GET_DIGIT
+	
+	stwio	r15, D7S_Low(r8)
 	
 	ldw 	ra, (sp)
 	addi	sp, sp, 4
@@ -294,16 +323,16 @@ LED_TESTE: # place-holder
 	stw 	ra, (sp)
 	
 	# acende/apaga os leds
-	ldwio	r11, 0(r8)
+	ldwio	r11, RED_LED(r8)
 	beq 	r11, r0, Acende
 	br		Apaga
 	Acende:
 	movia 	r12, LED_SEQ
 	ldw 	r11, 0(r12)
-	stwio	r11, 0(r8)
+	stwio	r11, RED_LED(r8)
 	br		Final
 	Apaga:
-	stwio	r0, 0(r8)
+	stwio	r0, RED_LED(r8)
 	Final:
 	
 	ldw 	r11, 4(sp)
@@ -362,6 +391,6 @@ MAIN:
 LED_SEQ: # sequencia que define quais leds acendem
 .word 0x00000000
 D7_SEG: # tabela de conversao para decimal em 7-segmentos
-.byte 0b01110110
+.byte 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
 BUFFER: # buffer para os comandos
 .byte 0x00, 0x00, 0x00, 0x00, 0x00
