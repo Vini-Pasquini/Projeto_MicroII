@@ -293,9 +293,14 @@ SWTCH_NUM: # comando 10
 	
 	ldwio	r11, SWTCH(r8)
 	
-	movi	r9, 0x0
-	movi	r7, 0x0
-	movi	r6, 0x0
+	movi	r12, 0x373E # maior valor cujo triangular nao ultrapassa 8 digitos é 14141
+	bge 	r11, r12, DISPLAY_ERROR
+	
+	# o calculo do triangular vem aki
+	
+	and 	r9, r9, r0
+	and 	r7, r7, r0
+	and 	r6, r6, r0
 	GET_DIGIT:
 	movi	r12, 0xA
 	divu	r13, r11, r12
@@ -308,7 +313,6 @@ SWTCH_NUM: # comando 10
 	add 	r12, r12, r14
 	ldb 	r13, (r12)
 	
-	# isso vai mudar um pouco
 	movi	r12, 0x20
 	bge 	r9, r12, HIGH_DIGIT
 		LOW_DIGIT:
@@ -320,10 +324,15 @@ SWTCH_NUM: # comando 10
 	sll 	r13, r13, r12
 	or  	r7, r7, r13
 		END_DIGIT:
-	
 	addi	r9, r9, 8
 	bne 	r11, r0, GET_DIGIT
+	br  	DISPLAY_NUM
 	
+		DISPLAY_ERROR:
+	orhi	r6, r0, 0x5000
+	orhi	r7, r0, 0x7950
+	ori 	r7, r7, 0x505C
+		DISPLAY_NUM:
 	stwio	r6, D7S_Low(r8)
 	stwio	r7, D7S_High(r8)
 	
