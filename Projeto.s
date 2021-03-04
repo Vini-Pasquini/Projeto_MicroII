@@ -11,8 +11,9 @@
 
 # RTI
 .org 0x20
-	addi	sp, sp, -32
-	stw 	r15, 28(sp)
+	addi	sp, sp, -36
+	stw 	r7, 32(sp)
+	stw 	r6, 28(sp)
 	stw 	r14, 24(sp)
 	stw 	r13, 20(sp)
 	stw 	r12, 16(sp)
@@ -33,9 +34,10 @@
 	ldw 	r12, 16(sp)
 	ldw 	r13, 20(sp)
 	ldw 	r14, 24(sp)
-	ldw 	r15, 28(sp)
+	ldw 	r6, 28(sp)
+	ldw 	r7, 32(sp)
 	ldw 	ra, (sp)
-	addi	sp, sp, 32
+	addi	sp, sp, 36
 	eret
 
 JTAG_INTERRUPT:
@@ -292,6 +294,8 @@ SWTCH_NUM: # comando 10
 	ldwio	r11, SWTCH(r8)
 	
 	movi	r9, 0x0
+	movi	r7, 0x0
+	movi	r6, 0x0
 	GET_DIGIT:
 	movi	r12, 0xA
 	divu	r13, r11, r12
@@ -301,16 +305,27 @@ SWTCH_NUM: # comando 10
 	mov 	r11, r13
 	
 	movia	r12, D7_SEG
-	add		r12, r12, r14
+	add 	r12, r12, r14
 	ldb 	r13, (r12)
 	
+	# isso vai mudar um pouco
+	movi	r12, 0x20
+	bge 	r9, r12, HIGH_DIGIT
+		LOW_DIGIT:
 	sll 	r13, r13, r9
-	or  	r15, r15, r13
+	or  	r6, r6, r13
+	br  	END_DIGIT
+		HIGH_DIGIT:
+	subi	r12, r9, 0x20
+	sll 	r13, r13, r12
+	or  	r7, r7, r13
+		END_DIGIT:
 	
 	addi	r9, r9, 8
 	bne 	r11, r0, GET_DIGIT
 	
-	stwio	r15, D7S_Low(r8)
+	stwio	r6, D7S_Low(r8)
+	stwio	r7, D7S_High(r8)
 	
 	ldw 	ra, (sp)
 	addi	sp, sp, 4
