@@ -296,7 +296,11 @@ SWTCH_NUM: # comando 10
 	movi	r12, 0x373E # maior valor cujo triangular nao ultrapassa 8 digitos é 14141
 	bge 	r11, r12, DISPLAY_ERROR
 	
-	# o calculo do triangular vem aki
+	# Tn = (n.(n+1))/2
+	addi	r12, r11, 0x1
+	mul 	r13, r11, r12
+	movi	r12, 0x2
+	divu	r11, r13, r12
 	
 	and 	r9, r9, r0
 	and 	r7, r7, r0
