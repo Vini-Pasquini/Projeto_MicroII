@@ -6,8 +6,12 @@
 .equ	D7S_Low,	0x20
 .equ	D7S_High,	0x30
 .equ	SWTCH,		0x40
+.equ	Push_Butt,	0x50
+.equ	PB_Mask,	0x58
+.equ	PB_Edge,	0x5C
 .equ	JTAG_Data,	0x1000
 .equ	JTAG_Ctrl,	0x1004
+.equ	Timer,  	0x2000
 
 # RTI
 .org 0x20
@@ -22,12 +26,36 @@
 	stw 	r9, 4(sp)
 	stw 	ra, (sp)
 	
-	# verifica de onde veio a interrupcao (vai precisar pra dps, por enquanto eh so jtag)
-	#rdctl	et, ipending
+	# Verifica de onde veio a interrupcao
+	rdctl	et, ipending
+	beq 	et, r0, OTHER_EXC
+	br  	INTERRUPT
+	
+	OTHER_EXC:
+	br  	QUIT_RTI
+	
+	INTERRUPT:
 	subi	ea, ea, 0x4
 	
+	andi	r11, et, 0x100
+	beq 	r11, r0, NOT_JTAG
 	call	JTAG_INTERRUPT
+	br  	QUIT_RTI
+	NOT_JTAG:
 	
+	andi	r11, et, 0x2
+	beq 	r11, r0, NOT_BUTT
+	call	BUTT_INTERRUPT
+	br  	QUIT_RTI
+	NOT_BUTT:
+	
+	andi	r11, et, 0x1
+	beq 	r11, r0, NOT_TIMER
+	call	TIMER_INTERRUPT
+	br  	QUIT_RTI
+	NOT_TIMER:
+	
+	QUIT_RTI:
 	ldw 	r9, 4(sp)
 	ldw 	r10, 8(sp)
 	ldw 	r11, 12(sp)
@@ -40,6 +68,39 @@
 	addi	sp, sp, 36
 	eret
 
+TIMER_INTERRUPT:
+	addi	sp, sp, -4
+	stw 	ra, (sp)
+	
+	# Acende/apaga os leds
+	ldwio	r11, RED_LED(r8)
+	beq 	r11, r0, TURN_ON
+	br		TURN_OFF
+	TURN_ON:
+	movia 	r12, LED_SEQ
+	ldw 	r11, 0(r12)
+	stwio	r11, RED_LED(r8)
+	br		END_TURN
+	TURN_OFF:
+	stwio	r0, RED_LED(r8)
+	END_TURN:
+	stwio	r0,	Timer(r8)
+	
+	ldw 	ra, (sp)
+	addi	sp, sp, 4
+	ret
+	
+BUTT_INTERRUPT:
+	addi	sp, sp, -4
+	stw 	ra, (sp)
+	
+	movia	r11, 0x6
+	stwio	r11, PB_Edge(r8)
+	
+	ldw 	ra, (sp)
+	addi	sp, sp, 4
+	ret
+	
 JTAG_INTERRUPT:
 	addi	sp, sp, -4
 	stw 	ra, (sp)
@@ -396,57 +457,46 @@ WORD_OFF: # comando 21
 	addi	sp, sp, 12
 	ret
 	
-LED_TESTE: # place-holder
-	addi	sp, sp, -12
-	stw 	r12, 8(sp)
-	stw 	r11, 4(sp)
-	stw 	ra, (sp)
-	
-	# acende/apaga os leds
-	ldwio	r11, RED_LED(r8)
-	beq 	r11, r0, Acende
-	br		Apaga
-	Acende:
-	movia 	r12, LED_SEQ
-	ldw 	r11, 0(r12)
-	stwio	r11, RED_LED(r8)
-	br		Final
-	Apaga:
-	stwio	r0, RED_LED(r8)
-	Final:
-	
-	ldw 	r11, 4(sp)
-	ldw 	r12, 8(sp)
-	ldw 	ra, (sp)
-	addi	sp, sp, 12
-	ret
-
 .global _start
 _start:
 	/* r8 - Endereco Base */
 	/* r9 - Contador */
 	/* r10 - Buffer */
 	/* [r11 - r13] - Aux */
-	movia	sp, STACK
+	movia	sp, STACK # Seta endereco inicial da Stack
 	
-	movia	r8, BASE_IO
+	movia	r8, BASE_IO # Endereco base para E/S
 	
 	/* Habilitando interrupcoes necessarias */
+	# JTag
 	ldwio	r9, JTAG_Ctrl(r8)
 	ori 	r9, r9, 0x1
 	stwio	r9, JTAG_Ctrl(r8)
 	
-	movi	r9, 0x100
+	# Seta os bits dos botoes 1 e 2 no registrador de interrupcao
+	movi	r9, 0x6 # Equivalente a 0b0110
+	stwio	r9, PB_Mask(r8)
+	
+	# Seta o tempo do timer (o mais proximo de 250ms que consegui)
+	movia	r10, 0xFFFF
+	stwio	r10, Timer+8(r8)
+	movia	r10, 0xAF
+	stwio	r10, Timer+12(r8)
+	movia	r10, 0x7
+	stwio	r10, Timer+4(r8)
+	
+	# Habilita as interrupcoes dos dispositivos
+	movi	r9, 0x103
 	wrctl	ienable, r9
 	
-	/* Habilita interrupcoes no processador */
+	# Habilita interrupcoes no processador
 	movi	r9, 1
 	wrctl	status, r9
 
-	# seta o endereco para o buffer
+	# Seta o endereco para o buffer
 	movia	r10, BUFFER
 	
-	# imprime "cmd:"  no terminal
+	# Imprime "cmd:"  no terminal
 	mov 	r9, r0
 	movi	r9, 0x63
 	stwio	r9, JTAG_Data(r8)
@@ -458,13 +508,6 @@ _start:
 	stwio	r9, JTAG_Data(r8)
 
 MAIN:
-	# timer provisorio (sera posto como interrupcao depois)
-	ori 	r11, r0, 0xffff
-	orhi	r11, r11, 0xf
-	delay:
-	subi	r11, r11, 0x1
-	bne 	r0, r11, delay
-	call	LED_TESTE
 	
 	br	MAIN
 	
