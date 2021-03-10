@@ -15,15 +15,14 @@
 
 # RTI
 .org 0x20
-	addi	sp, sp, -36
-	stw 	r7, 32(sp)
-	stw 	r6, 28(sp)
-	stw 	r14, 24(sp)
-	stw 	r13, 20(sp)
-	stw 	r12, 16(sp)
-	stw 	r11, 12(sp)
-	stw 	r10, 8(sp)
-	stw 	r9, 4(sp)
+	addi	sp, sp, -32
+	stw 	r14, 28(sp)
+	stw 	r13, 24(sp)
+	stw 	r12, 20(sp)
+	stw 	r11, 16(sp)
+	stw 	r7, 12(sp)
+	stw 	r6, 8(sp)
+	stw 	r5, 4(sp)
 	stw 	ra, (sp)
 	
 	# Verifica de onde veio a interrupcao
@@ -56,16 +55,15 @@
 	NOT_TIMER:
 	
 	QUIT_RTI:
-	ldw 	r9, 4(sp)
-	ldw 	r10, 8(sp)
-	ldw 	r11, 12(sp)
-	ldw 	r12, 16(sp)
-	ldw 	r13, 20(sp)
-	ldw 	r14, 24(sp)
-	ldw 	r6, 28(sp)
-	ldw 	r7, 32(sp)
+	ldw 	r5, 4(sp)
+	ldw 	r6, 8(sp)
+	ldw 	r7, 12(sp)
+	ldw 	r11, 16(sp)
+	ldw 	r12, 20(sp)
+	ldw 	r13, 24(sp)
+	ldw 	r14, 28(sp)
 	ldw 	ra, (sp)
-	addi	sp, sp, 36
+	addi	sp, sp, 32
 	eret
 
 TIMER_INTERRUPT:
@@ -94,6 +92,48 @@ BUTT_INTERRUPT:
 	addi	sp, sp, -4
 	stw 	ra, (sp)
 	
+	# Verifica se rotacao esta ligada
+	ldb 	r13, 0(r9)
+	beq 	r13, r0, QUIT_BUTT
+	# Verifica qual botao foi pressionado
+	ldwio	r13, PB_Edge(r8)
+	movi	r11, 0x02
+	bne 	r11, r13, OTHER_BUTT
+	
+	/* Botao 1 */
+	# Verifica direcao da rotacao
+	ldb 	r13, 1(r9)
+	beq 	r13, r0, QUIT_BUTT # Se pausada, sai
+	bne 	r13, r11, R_to_L
+	
+	L_to_R: # Muda de esquerda para direita
+	movi	r11, 0x01
+	stb 	r11, 1(r9)
+	stb 	r11, 2(r9)
+	br  	QUIT_BUTT
+	
+	R_to_L: # Muda de direita para esquerda
+	movi	r11, 0x02
+	stb 	r11, 1(r9)
+	stb 	r11, 2(r9)
+	br  	QUIT_BUTT
+	
+	/* Botao 2 */
+	OTHER_BUTT:
+	# Verifica se rotacao esta pausada
+	ldb 	r13, 1(r9)
+	bne 	r13, r0, ROT_ON
+	# Se estiver pausada, retoma
+	ldb 	r13, 2(r9)
+	stb 	r13, 1(r9)
+	br  	QUIT_BUTT
+	# Se nao, pausa
+	ROT_ON:
+	stb 	r13, 2(r9)
+	stb 	r0, 1(r9)
+	
+	QUIT_BUTT:
+	
 	movia	r11, 0x6
 	stwio	r11, PB_Edge(r8)
 	
@@ -112,7 +152,6 @@ JTAG_INTERRUPT:
 	beq 	r11, r12, ENTER_INPUTED
 	
 	# atualiza o buffer do comando com o novo char
-	movia	r10, BUFFER
 	ldb 	r11, 1(r10)
 	stb 	r11, 0(r10)
 	
@@ -364,9 +403,9 @@ SWTCH_NUM: # comando 10
 	movi	r12, 0x2
 	divu	r11, r13, r12
 	
-	and 	r9, r9, r0
 	and 	r7, r7, r0
 	and 	r6, r6, r0
+	and 	r5, r5, r0
 	GET_DIGIT:
 	movi	r12, 0xA
 	divu	r13, r11, r12
@@ -380,17 +419,17 @@ SWTCH_NUM: # comando 10
 	ldb 	r13, (r12)
 	
 	movi	r12, 0x20
-	bge 	r9, r12, HIGH_DIGIT
+	bge 	r5, r12, HIGH_DIGIT
 		LOW_DIGIT:
-	sll 	r13, r13, r9
+	sll 	r13, r13, r5
 	or  	r6, r6, r13
 	br  	END_DIGIT
 		HIGH_DIGIT:
-	subi	r12, r9, 0x20
+	subi	r12, r5, 0x20
 	sll 	r13, r13, r12
 	or  	r7, r7, r13
 		END_DIGIT:
-	addi	r9, r9, 8
+	addi	r5, r5, 8
 	bne 	r11, r0, GET_DIGIT
 	br  	DISPLAY_NUM
 	
@@ -410,8 +449,7 @@ WORD_ON: # comando 20
 	addi	sp, sp, -4
 	stw 	ra, (sp)
 	
-	movia	r12, WORD_FLAG
-	ldb 	r11, (r12)
+	ldb 	r11, 0(r9)
 	bne 	r11, r0, SKIP_ROT
 	
 	stwio	r0, D7S_Low(r8)
@@ -419,28 +457,24 @@ WORD_ON: # comando 20
 	
 	and 	r11, r11, r0 # limpa tanto parte baixa quanto parte alta
 	
-	ldwio	r12, D7S_Low(r8)
 	orhi	r11, r0, 0x5B06 # 21 nos displays (parte alta do display baixo)
 	stwio	r11, D7S_Low(r8)
 	
 	and 	r11, r11, r0 # limpa tanto parte baixa quanto parte alta
 	
-	ldwio	r12, D7S_High(r8)
 	ori 	r11, r0, 0x5B3F # 20 nos displays (parte baixa do display alto)
 	stwio	r11, D7S_High(r8)
 	SKIP_ROT:
 	
 	movi	r11, 0x01
-	movia	r12, WORD_FLAG
-	stb 	r11, (r12)
+	stb 	r11, 0(r9)
 	
 	ldw 	ra, (sp)
 	addi	sp, sp, 4
 	ret
 	
 WORD_OFF: # comando 21
-	addi	sp, sp, -12
-	stw 	r12, 8(sp)
+	addi	sp, sp, -8
 	stw 	r11, 4(sp)
 	stw 	ra, (sp)
 	
@@ -448,13 +482,11 @@ WORD_OFF: # comando 21
 	stwio	r0, D7S_High(r8)
 	
 	movi	r11, 0x00
-	movia	r12, WORD_FLAG
-	stb 	r11, (r12)
+	stb 	r11, 0(r9)
 	
 	ldw 	r11, 4(sp)
-	ldw 	r12, 8(sp)
 	ldw 	ra, (sp)
-	addi	sp, sp, 12
+	addi	sp, sp, 8
 	ret
 	
 ROTATE_LEFT:
@@ -526,14 +558,14 @@ ROTATE_RIGHT:
 .global _start
 _start:
 	/* r8 - Endereco Base */
-	/* r9 - Flag direcional da rotacao */
+	/* r9 - Flag para rotacao */
 	/* r10 - Buffer */
 	/* [r11 - r14] - Aux */
 	
 	movia	sp, STACK # Seta endereco inicial da Stack
 	
 	movia	r8, BASE_IO # Endereco base para E/S
-	movia	r9, DIR_FLAG # Seta o endereco para a flag direcional
+	movia	r9, ROT_FLAG # Seta o endereco para a flag direcional
 	movia	r10, BUFFER # Seta o endereco para o buffer
 	
 	/* Habilitando interrupcoes necessarias */
@@ -582,9 +614,11 @@ MAIN:
 	bne 	r0, r11, WAIT
 	
 	ldb 	r13, 0(r9)
-	
 	beq 	r13, r0, END_ROT
+	
 	movi	r11, 0x1
+	ldb 	r13, 1(r9)
+	beq 	r13, r0, END_ROT
 	beq 	r13, r11, R_ROT
 	L_ROT:
 	call	ROTATE_LEFT
@@ -597,10 +631,8 @@ MAIN:
 	
 LED_SEQ: # sequencia que define quais leds acendem
 .word 0x00000000
-WORD_FLAG: # bool pra verificar se a rotacao da palavra esta ativa
-.byte 0x00
-DIR_FLAG: # flag para verificar a direcao da rotacao (0 - parado, 2 - esquerda, 1 - direita)
-.byte 0x02, 0x02 # a segunda posicao guarda a direcao mais recente
+ROT_FLAG: # Flag para rotacao (0 - Rotacao ligada [0 ou 1]; 1 - Direcao [0, 1, 2]; 2 - buffer)
+.byte 0x00, 0x02, 0x01 # (Direcoes: 0 - parado; 2 - esquerda; 1 - direita)
 D7_SEG: # tabela de conversao para decimal em 7-segmentos
 .byte 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
 BUFFER: # buffer para os comandos
