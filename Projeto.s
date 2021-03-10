@@ -175,8 +175,10 @@ VALID_COMMAND:
 	call	SWTCH_NUM
 	br		END_CHECK
 		CMD_20:
+	call	WORD_ON
 	br		END_CHECK
 		CMD_21:
+	call	WORD_OFF
 	br		END_CHECK
 	
 	NOT_FOUND:
@@ -288,8 +290,7 @@ SWTCH_NUM: # comando 10
 	addi	sp, sp, -4
 	stw 	ra, (sp)
 	
-	stwio	r0, D7S_Low(r8)
-	stwio	r0, D7S_High(r8)
+	call	WORD_OFF # Limpa os displays e seta flag da rotacao pra 0 (comando 21)
 	
 	ldwio	r11, SWTCH(r8)
 	
@@ -342,6 +343,57 @@ SWTCH_NUM: # comando 10
 	
 	ldw 	ra, (sp)
 	addi	sp, sp, 4
+	ret
+	
+WORD_ON: # comando 20
+	addi	sp, sp, -4
+	stw 	ra, (sp)
+	
+	movia	r12, WORD_FLAG
+	ldb 	r11, (r12)
+	bne 	r11, r0, SKIP_ROT
+	
+	stwio	r0, D7S_Low(r8)
+	stwio	r0, D7S_High(r8)
+	
+	and 	r11, r11, r0 # limpa tanto parte baixa quanto parte alta
+	
+	ldwio	r12, D7S_Low(r8)
+	orhi	r11, r0, 0x5B06 # 21 nos displays (parte alta do display baixo)
+	stwio	r11, D7S_Low(r8)
+	
+	and 	r11, r11, r0 # limpa tanto parte baixa quanto parte alta
+	
+	ldwio	r12, D7S_High(r8)
+	ori 	r11, r0, 0x5B3F # 20 nos displays (parte baixa do display alto)
+	stwio	r11, D7S_High(r8)
+	SKIP_ROT:
+	
+	movi	r11, 0x01
+	movia	r12, WORD_FLAG
+	stb 	r11, (r12)
+	
+	ldw 	ra, (sp)
+	addi	sp, sp, 4
+	ret
+	
+WORD_OFF: # comando 21
+	addi	sp, sp, -12
+	stw 	r12, 8(sp)
+	stw 	r11, 4(sp)
+	stw 	ra, (sp)
+	
+	stwio	r0, D7S_Low(r8)
+	stwio	r0, D7S_High(r8)
+	
+	movi	r11, 0x00
+	movia	r12, WORD_FLAG
+	stb 	r11, (r12)
+	
+	ldw 	r11, 4(sp)
+	ldw 	r12, 8(sp)
+	ldw 	ra, (sp)
+	addi	sp, sp, 12
 	ret
 	
 LED_TESTE: # place-holder
@@ -418,6 +470,8 @@ MAIN:
 	
 LED_SEQ: # sequencia que define quais leds acendem
 .word 0x00000000
+WORD_FLAG: # bool pra verificar se a rotacao da palavra esta ativa
+.byte 0x00
 D7_SEG: # tabela de conversao para decimal em 7-segmentos
 .byte 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
 BUFFER: # buffer para os comandos
