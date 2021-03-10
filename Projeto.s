@@ -457,57 +457,141 @@ WORD_OFF: # comando 21
 	addi	sp, sp, 12
 	ret
 	
+ROTATE_LEFT:
+	addi	sp, sp, -20
+	stw 	r14, 16(sp)
+	stw 	r13, 12(sp)
+	stw 	r12, 8(sp)
+	stw 	r11, 4(sp)
+	stw 	ra, (sp)
+	
+	ldwio	r11, D7S_Low(r8)
+	andhi	r12, r11, 0xFF00
+	srli	r12, r12, 0x18
+	
+	ldwio	r13, D7S_High(r8)
+	andhi	r14, r13, 0xFF00
+	srli	r14, r14, 0x18
+	
+	slli	r11, r11, 0x8
+	or  	r11, r11, r14
+	
+	slli	r13, r13, 0x8
+	or  	r13, r13, r12
+	
+	stwio	r13, D7S_High(r8)
+	stwio	r11, D7S_Low(r8)
+	
+	ldw 	r11, 4(sp)
+	ldw 	r12, 8(sp)
+	ldw 	r13, 12(sp)
+	ldw 	r14, 16(sp)
+	ldw 	ra, (sp)
+	addi	sp, sp, 20
+	ret
+	
+ROTATE_RIGHT:
+	addi	sp, sp, -20
+	stw 	r14, 16(sp)
+	stw 	r13, 12(sp)
+	stw 	r12, 8(sp)
+	stw 	r11, 4(sp)
+	stw 	ra, (sp)
+	
+	ldwio	r11, D7S_Low(r8)
+	andi	r12, r11, 0xFF
+	slli	r12, r12, 0x18
+	
+	ldwio	r13, D7S_High(r8)
+	andi	r14, r13, 0xFF
+	slli	r14, r14, 0x18
+	
+	srli	r11, r11, 0x8
+	or  	r11, r11, r14
+	
+	srli	r13, r13, 0x8
+	or  	r13, r13, r12
+	
+	stwio	r13, D7S_High(r8)
+	stwio	r11, D7S_Low(r8)
+	
+	ldw 	r11, 4(sp)
+	ldw 	r12, 8(sp)
+	ldw 	r13, 12(sp)
+	ldw 	r14, 16(sp)
+	ldw 	ra, (sp)
+	addi	sp, sp, 20
+	ret
+	
 .global _start
 _start:
 	/* r8 - Endereco Base */
-	/* r9 - Contador */
+	/* r9 - Flag direcional da rotacao */
 	/* r10 - Buffer */
-	/* [r11 - r13] - Aux */
+	/* [r11 - r14] - Aux */
+	
 	movia	sp, STACK # Seta endereco inicial da Stack
 	
 	movia	r8, BASE_IO # Endereco base para E/S
+	movia	r9, DIR_FLAG # Seta o endereco para a flag direcional
+	movia	r10, BUFFER # Seta o endereco para o buffer
 	
 	/* Habilitando interrupcoes necessarias */
 	# JTag
-	ldwio	r9, JTAG_Ctrl(r8)
-	ori 	r9, r9, 0x1
-	stwio	r9, JTAG_Ctrl(r8)
+	ldwio	r11, JTAG_Ctrl(r8)
+	ori 	r11, r11, 0x1
+	stwio	r11, JTAG_Ctrl(r8)
 	
 	# Seta os bits dos botoes 1 e 2 no registrador de interrupcao
-	movi	r9, 0x6 # Equivalente a 0b0110
-	stwio	r9, PB_Mask(r8)
+	movi	r11, 0x6 # Equivalente a 0b0110
+	stwio	r11, PB_Mask(r8)
 	
-	# Seta o tempo do timer (o mais proximo de 250ms que consegui)
-	movia	r10, 0xFFFF
-	stwio	r10, Timer+8(r8)
-	movia	r10, 0xAF
-	stwio	r10, Timer+12(r8)
-	movia	r10, 0x7
-	stwio	r10, Timer+4(r8)
+	# Seta o tempo do timer (Aproximadamente 250ms)
+	movia	r11, 0xFFFF
+	stwio	r11, Timer+8(r8)
+	movia	r11, 0xAF
+	stwio	r11, Timer+12(r8)
+	movia	r11, 0x7
+	stwio	r11, Timer+4(r8)
 	
 	# Habilita as interrupcoes dos dispositivos
-	movi	r9, 0x103
-	wrctl	ienable, r9
+	movi	r11, 0x103
+	wrctl	ienable, r11
 	
 	# Habilita interrupcoes no processador
-	movi	r9, 1
-	wrctl	status, r9
-
-	# Seta o endereco para o buffer
-	movia	r10, BUFFER
+	movi	r11, 1
+	wrctl	status, r11
 	
 	# Imprime "cmd:"  no terminal
-	mov 	r9, r0
-	movi	r9, 0x63
-	stwio	r9, JTAG_Data(r8)
-	movi	r9, 0x6d
-	stwio	r9, JTAG_Data(r8)
-	movi	r9, 0x64
-	stwio	r9, JTAG_Data(r8)
-	movi	r9, 0x3a
-	stwio	r9, JTAG_Data(r8)
+	mov 	r11, r0
+	movi	r11, 0x63
+	stwio	r11, JTAG_Data(r8)
+	movi	r11, 0x6d
+	stwio	r11, JTAG_Data(r8)
+	movi	r11, 0x64
+	stwio	r11, JTAG_Data(r8)
+	movi	r11, 0x3a
+	stwio	r11, JTAG_Data(r8)
 
 MAIN:
+	# Tempo pra rotacao (Aproximadamente 200ms)
+	ori 	r11, r0, 0xffff
+	orhi	r11, r11, 0x7
+	WAIT:
+	subi	r11, r11, 0x1
+	bne 	r0, r11, WAIT
+	
+	ldb 	r13, 0(r9)
+	
+	beq 	r13, r0, END_ROT
+	movi	r11, 0x1
+	beq 	r13, r11, R_ROT
+	L_ROT:
+	call	ROTATE_LEFT
+	br	END_ROT
+	R_ROT:
+	call	ROTATE_RIGHT
+	END_ROT:
 	
 	br	MAIN
 	
@@ -515,6 +599,8 @@ LED_SEQ: # sequencia que define quais leds acendem
 .word 0x00000000
 WORD_FLAG: # bool pra verificar se a rotacao da palavra esta ativa
 .byte 0x00
+DIR_FLAG: # flag para verificar a direcao da rotacao (0 - parado, 2 - esquerda, 1 - direita)
+.byte 0x02, 0x02 # a segunda posicao guarda a direcao mais recente
 D7_SEG: # tabela de conversao para decimal em 7-segmentos
 .byte 0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F
 BUFFER: # buffer para os comandos
